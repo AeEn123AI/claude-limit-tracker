@@ -160,23 +160,25 @@
     var fromFive = fh ? fh[kind()][u].median * (24 / 5) * DAYS_PER_MONTH : Infinity;  // 5h bar maxed around the clock
     var month = Math.min(fromWeek, fromFive);
     var t = el("article", { "class": "tile" });
-    t.appendChild(el("div", { "class": "label" }, "Rough monthly value if you max it every week"));
+    t.appendChild(el("div", { "class": "label" }, "Paying for the same usage via the API instead (maxed every week)"));
     var v = el("div", { "class": "value" }, fmt(month, u) + " ");
-    v.appendChild(el("small", null, u === "usd" ? "API-equivalent / month" : (u === "wtok" ? "weighted tokens / month" : "raw tokens / month")));
+    v.appendChild(el("small", null, u === "usd" ? "/ month on the API" : (u === "wtok" ? "weighted tokens / month" : "raw tokens / month")));
     t.appendChild(v);
     t.appendChild(el("div", { "class": "range" }, fromWeek <= fromFive ? "Weekly 100% × " + (DAYS_PER_MONTH / 7).toFixed(2) + " weeks (the weekly bar is the real cap)"
       : "5-hour 100% × " + (24 / 5 * DAYS_PER_MONTH).toFixed(0) + " windows"));
     if (u === "usd") {
       var price = state.price || DATA.plan_price || 20;
       var row = el("div", { "class": "mult" });
-      row.appendChild(el("b", null, "≈ " + (month / price).toFixed(month / price >= 10 ? 0 : 1) + "× "));
-      row.appendChild(document.createTextNode("the "));
+      row.appendChild(document.createTextNode("API cost ≈ "));
+      row.appendChild(el("b", null, (month / price).toFixed(month / price >= 10 ? 0 : 1) + "× "));
+      row.appendChild(document.createTextNode("what you pay for "));
       var inp = el("input", { type: "number", min: "1", step: "1", value: String(price), "aria-label": "Plan price per month in USD" });
       inp.addEventListener("change", function () { var n = parseFloat(inp.value); if (n > 0) { state.price = n; renderTiles(); } });
       row.appendChild(document.createTextNode("$"));
       row.appendChild(inp);
-      var planName = DATA.plan && price === (DATA.plan_price || 20) ? " " + DATA.plan : "";
-      row.appendChild(document.createTextNode("/month" + planName + " plan"));
+      var planName = DATA.plan && price === (DATA.plan_price || 20) ? DATA.plan : "the plan";
+      row.insertBefore(document.createTextNode(planName + " ("), inp.previousSibling || inp);
+      row.appendChild(document.createTextNode("/month)"));
       t.appendChild(row);
       if (oh) t.appendChild(el("div", { "class": "note" }, "With unlogged helper calls: ≈ " + fmt(month * oh.lo, "usd") + "–" + fmt(month * oh.hi, "usd") +
         " (" + (month * oh.lo / price).toFixed(0) + "–" + (month * oh.hi / price).toFixed(0) + "×)."));
