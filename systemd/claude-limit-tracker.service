@@ -1,0 +1,14 @@
+# Example user service. Copy to ~/.config/systemd/user/ and adjust the path.
+[Unit]
+Description=Claude limit tracker: collect, commit and push estimates
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+# Path to your clone of this repository:
+WorkingDirectory=%h/claude-limit-tracker
+# Optional settings (LIMIT_TRACKER_STREAMS=..., LIMIT_TRACKER_PLAN=...), one per line:
+EnvironmentFile=-%h/.config/claude-limit-tracker.env
+ExecStart=/bin/sh collector/run_daily.sh
+Nice=10

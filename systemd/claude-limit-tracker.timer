@@ -1,0 +1,11 @@
+# Runs the collector every day at 00:00 UTC (and at the next boot if a run was missed).
+[Unit]
+Description=Daily Claude limit tracker refresh
+
+[Timer]
+OnCalendar=*-*-* 00:00:00 UTC
+Persistent=true
+RandomizedDelaySec=120
+
+[Install]
+WantedBy=timers.target

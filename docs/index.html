@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Claude limit tracker: how big is 100% of the bar?</title>
+<meta name="description" content="Community estimate of what Claude's 5-hour and weekly plan limits are worth in API-equivalent dollars and tokens, tracked over time to spot quiet limit changes.">
+<link rel="stylesheet" href="style.css">
+<script>
+  // theme: stored choice wins, otherwise follow the OS
+  (function () { var t = localStorage.getItem("lt-theme"); if (t) document.documentElement.dataset.theme = t; })();
+</script>
+</head>
+<body>
+<div class="viz-root">
+<header class="wrap">
+  <div class="topline">
+    <h1>Claude limit tracker</h1>
+    <button id="theme" class="ghost" type="button" aria-label="Toggle light or dark theme">Theme</button>
+  </div>
+  <p class="lede">How much usage is <strong>100%</strong> of Claude's 5-hour and weekly limit bars actually worth?
+    This page estimates it from one account's real usage, in API-equivalent dollars and tokens, and tracks it over time
+    so quiet limit changes show up as a step in the chart.</p>
+  <p class="meta" id="meta">Loading data…</p>
+</header>
+
+<main class="wrap">
+  <div class="controls" role="group" aria-label="Chart options">
+    <div class="seg" role="radiogroup" aria-label="Unit">
+      <button type="button" role="radio" data-unit="usd" aria-checked="true">$ API-equivalent</button>
+      <button type="button" role="radio" data-unit="wtok" aria-checked="false">Weighted tokens</button>
+      <button type="button" role="radio" data-unit="rawtok" aria-checked="false">Raw tokens</button>
+    </div>
+    <label class="check"><input type="checkbox" id="adjust" checked> Adjust for model mix</label>
+    <div class="seg" role="radiogroup" aria-label="Time range">
+      <button type="button" role="radio" data-range="all" aria-checked="true">All</button>
+      <button type="button" role="radio" data-range="30" aria-checked="false">30 days</button>
+      <button type="button" role="radio" data-range="14" aria-checked="false">14 days</button>
+    </div>
+  </div>
+
+  <section id="tiles" class="tiles" aria-live="polite"></section>
+
+  <section id="charts"></section>
+
+  <section class="card" id="changes-card">
+    <h2>Possible limit changes</h2>
+    <p class="muted small">Detected automatically: a lasting step in the mix-adjusted per-window estimates
+      (rank test, |z| ≥ 3.3, at least 6 windows each side for the 5-hour bar and 3 for weekly bars, and a ≥ 15% shift).
+      Early resets are times the reported utilization fell without the window's reset time changing.</p>
+    <ul id="changes" class="events"></ul>
+  </section>
+
+  <section class="card prose" id="explainer">
+    <h2>What is this?</h2>
+    <p>Claude's subscription plans show usage as percentage bars (a rolling <em>5-hour</em> window and a <em>weekly</em> window,
+      sometimes extra per-model weekly bars) but never say how much work 100% is. Claude Code receives the exact utilization
+      with every response, and its logs record the exact token usage of every API call. Put the two side by side and you can
+      work out what a full bar is worth, then watch whether that number moves.</p>
+    <p>The numbers here are <strong>API-equivalent</strong>: what the same calls would cost at
+      <a href="https://platform.claude.com/docs/en/about-claude/pricing">Anthropic's public API list prices</a>.
+      That's a common yardstick, not what a plan costs or how Anthropic meters internally.</p>
+
+    <h2>Method</h2>
+    <ol>
+      <li><strong>Calls.</strong> Every assistant message in the Claude Code transcripts on the tracking machine is one API call
+        with its model and usage (input, output, cache writes split into 5-minute and 1-hour TTL, cache reads, web searches).
+        Copies of the same call (one per content block, and again in stream logs) are de-duplicated by message id, keeping the largest counts.</li>
+      <li><strong>Utilization samples.</strong> <code>rate_limit_event</code> lines in Claude Code stream-json logs (or the
+        status line sampler) give each bar's utilization (0–100%, whole percents) and its reset time.
+        Each bar's window is identified by its reset time; it started 5 hours (or 7 days) earlier.</li>
+      <li><strong>Per window.</strong> Usage from the window start (utilization 0) to the first sample that shows the window's peak,
+        divided by that peak, gives "100% ≈ $X" for the window. If a bar is reset early mid-window, the part after the reset
+        is measured from its first sample instead. Windows that rose less than 20 points (5-hour) or 10 points (weekly) are skipped.
+        The error bar is the wider of ±1 utilization point of rounding and a bootstrap (16th–84th percentile) over 10-point (5-hour) / 5-point (weekly)
+        slices of the window.</li>
+      <li><strong>Model mix.</strong> Plans don't charge every model in proportion to API price. For each bar, a robust non-negative
+        regression of utilization rise on per-model usage, across all window slices, gives each model's weight. "Adjust for model mix"
+        re-expresses every window in the dominant model's dollars, so a week of a pricier-per-percent model doesn't look like a limit cut.
+        Untick it to see the raw numbers coloured by dominant model.</li>
+      <li><strong>Current estimate</strong> (dotted line) = median of the window estimates since the last detected change
+        (at most the last 14 days for the 5-hour bar, last 4 windows for weekly bars), with a bootstrap 95% interval for the median.</li>
+      <li><strong>Tokens.</strong> <em>Weighted tokens</em> are input-token equivalents using the standard API ratios regardless of model
+        (output ×5, 5-minute cache write ×1.25, 1-hour cache write ×2, cache read ×0.1). <em>Raw tokens</em> just add everything up
+        and are dominated by cache reads.</li>
+    </ol>
+
+    <h2>Caveats (please read)</h2>
+    <ul id="caveats">
+      <li><strong>One account, one plan.</strong> Other plans have other limits. Treat the level as indicative and the <em>changes</em> as the signal.</li>
+      <li><strong>Invisible usage biases estimates low.</strong> Anything on the account that this machine doesn't log (claude.ai in a browser,
+        the phone app, Claude Code on other computers) raises utilization with no matching logged usage, so the bar looks smaller than it is.
+        Robust statistics (medians, down-weighted outlier slices) limit the damage but can't remove it.</li>
+      <li id="overhead-caveat"><strong>Unlogged helper calls.</strong> Claude Code also makes calls that never appear as transcript messages
+        (compaction, summarising fetched pages, small helper models). Comparing its own cost totals with the logged calls suggests these add a few percent; true
+        values are likely that much higher.</li>
+      <li><strong>Timing.</strong> Utilization samples carry no timestamp of their own and are dated by the message they follow; samples only
+        exist while Claude Code runs in stream-json mode or a status line sampler is installed. Utilization is reported in whole percents.</li>
+      <li><strong>Prices are list prices</strong> checked on the date shown below; if API prices change, the dollar series changes meaning.
+        The token views don't depend on prices.</li>
+      <li>Utilization above 100% does happen (the request that crosses the limit is still counted).</li>
+    </ul>
+
+    <h2>Track your own account</h2>
+    <p>Everything here is produced by a small, dependency-free Python collector you can run yourself. It reads your local Claude Code logs and
+      writes only aggregate numbers. See <a id="repo-link" href="#">the repository README</a> for setup: a status line sampler (or stream-json logs)
+      for utilization, then <code>python3 collector/collect.py</code>, and an example systemd timer that refreshes a GitHub Pages copy of this site daily.</p>
+  </section>
+
+  <section class="card" id="tables">
+    <h2>Data tables</h2>
+    <p class="muted small">Every plotted point, for screen readers and anyone who prefers numbers. Raw JSON: <a href="data/estimates.json">data/estimates.json</a>.</p>
+    <div id="table-wrap"></div>
+  </section>
+</main>
+
+<footer class="wrap muted small">
+  <p>Not affiliated with Anthropic. Estimates, not official figures. <span id="foot-updated"></span></p>
+</footer>
+<div id="tip" class="tip" role="tooltip" hidden></div>
+</div>
+<script src="app.js"></script>
+</body>
+</html>
