@@ -144,3 +144,7 @@ footer.wrap { padding: 10px 16px 30px; }
   .tile .value { font-size: 1.7rem; }
   .seg button { padding: 6px 8px; font-size: 0.82rem; }
 }
+
+.tile .mult { margin: 8px 0 4px; font-size: 15px; }
+.tile .mult b { font-size: 18px; }
+.tile .mult input { width: 4.5em; font: inherit; padding: 1px 4px; margin: 0 2px; background: var(--surface-2, transparent); color: inherit; border: 1px solid var(--border, #8886); border-radius: 6px; }

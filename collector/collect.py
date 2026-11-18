@@ -803,6 +803,8 @@ def main(argv=None):
     ap.add_argument("--prices", default=os.path.join(HERE, "prices.json"))
     ap.add_argument("--plan", default=os.environ.get("LIMIT_TRACKER_PLAN"),
                     help="optional public plan label shown on the site, e.g. 'Max 20x'")
+    ap.add_argument("--plan-price", type=float, default=float(os.environ.get("LIMIT_TRACKER_PLAN_PRICE") or 20),
+                    help="monthly plan price in USD for the value card (default 20; viewers can change it on the site)")
     ap.add_argument("--bars", type=lambda v: tuple(x.strip() for x in v.split(",") if x.strip()),
                     default=TRACKED_BARS, help="comma separated bar keys to track (default: five_hour,seven_day)")
     ap.add_argument("--rebuild", action="store_true",
@@ -911,6 +913,7 @@ def main(argv=None):
         "schema": SCHEMA,
         "generated_at": iso(now),
         "plan": a.plan or None,
+        "plan_price": a.plan_price,
         "prices": {"source": pricer.p.get("_source"), "checked": pricer.p.get("_checked")},
         "coverage": {
             "calls": len(ledger.t),
