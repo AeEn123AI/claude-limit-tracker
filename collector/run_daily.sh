@@ -15,5 +15,7 @@ fi
 git commit -q -m "data: update $(date -u +%Y-%m-%d)"
 if [ "${LIMIT_TRACKER_PUSH:-1}" != "0" ]; then
   git push -q
+  echo "committed and pushed"
+else
+  echo "committed (push disabled)"
 fi
-echo "published"
