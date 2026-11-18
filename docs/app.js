@@ -244,11 +244,16 @@
       svg.appendChild(xl);
     }
     // early resets + possible changes
-    var resets = (DATA.events || []).filter(function (e) { return e.bar === bar.key && e.t1 >= x0 && e.t1 <= x1; });
+    // A reset (e.g. a free limit reset being used) applies to the whole account, so mark it on every chart.
+    var resets = [];
+    (DATA.events || []).forEach(function (e) {
+      if (e.t1 < x0 || e.t1 > x1) return;
+      if (!resets.some(function (r) { return Math.abs(r.t1 - e.t1) < 600; })) resets.push(e);
+    });
     resets.forEach(function (e) {
       svg.appendChild(sv("line", { x1: X(e.t1), x2: X(e.t1), y1: m.t, y2: m.t + ph, "class": "rst" }));
       var lb = sv("text", { x: X(e.t1) + 3, y: m.t - 8, "class": "lbl" });
-      lb.textContent = "early reset";
+      lb.textContent = "reset used";
       svg.appendChild(lb);
     });
     (bar.changes || []).forEach(function (ch) {
@@ -266,6 +271,19 @@
       var nl = sv("text", { x: W - m.r - 2, y: Y(cur.median) - 7, "text-anchor": "end", "class": "now-lbl" });
       nl.textContent = "now " + fmt(cur.median, state.unit, true);
       svg.appendChild(nl);
+    }
+    // trend line: rolling median of the window estimates (raw points when there are only a few)
+    if (pts.length > 1) {
+      var half = pts.length >= 15 ? 3 : pts.length >= 7 ? 1 : 0;
+      var vals = pts.map(function (w) { return pointVals(w)[0]; });
+      var dpath = "";
+      pts.forEach(function (w, i) {
+        var nb = vals.slice(Math.max(0, i - half), i + half + 1).sort(function (a, b) { return a - b; });
+        var med = nb.length % 2 ? nb[(nb.length - 1) / 2] : (nb[nb.length / 2 - 1] + nb[nb.length / 2]) / 2;
+        dpath += (i ? "L" : "M") + X(windowX(w)).toFixed(1) + " " + Y(med).toFixed(1);
+      });
+      svg.appendChild(sv("path", { d: dpath, "class": "trend" }));
+      var trendNote = half ? "trend (rolling median of " + (2 * half + 1) + ")" : "trend";
     }
     // error bars then points
     var placed = [];
@@ -302,6 +320,8 @@
       var name = slot === "3" ? "Mostly other models" : "Mostly " + prettyModel(present[slot]);
       legendItem(c.legend, key, name);
     });
+    if (trendNote) legendItem(c.legend, sv("line", { x1: 0, x2: 18, y1: 5, y2: 5, stroke: cssVar("--text-primary"), "stroke-width": 2, "stroke-opacity": 0.6 }), trendNote);
+    if (resets.length) legendItem(c.legend, sv("line", { x1: 9, x2: 9, y1: 0, y2: 10, stroke: cssVar("--muted"), "stroke-width": 1.5 }), "limit reset used");
     if (cur) {
       legendItem(c.legend, sv("line", { x1: 0, x2: 18, y1: 5, y2: 5, stroke: cssVar("--text-secondary"), "stroke-width": 2, "stroke-dasharray": "2 4", "stroke-linecap": "round" }), "current estimate");
       legendItem(c.legend, sv("rect", { x: 0, y: 1, width: 18, height: 8, fill: cssVar("--accent-wash") }), "95% CI of current");
@@ -381,10 +401,10 @@
       g.parts.push(label + " " + pct(e.from) + " → " + pct(e.to));
     });
     groups.forEach(function (g) {
-      items.push({ t: g.t1, text: "Early reset between " + dateTime(g.t0) + " and " + dateTime(g.t1) + ": " + g.parts.join("; ") + "." });
+      items.push({ t: g.t1, text: "Limit reset used between " + dateTime(g.t0) + " and " + dateTime(g.t1) + ": " + g.parts.join("; ") + "." });
     });
     items.sort(function (a, b) { return b.t - a.t; });
-    if (!items.length) items.push({ text: "No step changes or early resets detected yet." });
+    if (!items.length) items.push({ text: "No step changes or limit resets detected yet." });
     var anyChange = Object.keys(DATA.bars).some(function (k) { return (DATA.bars[k].changes || []).length; });
     if (!anyChange) items.unshift({ text: "No lasting step change in any bar's mix-adjusted estimate so far." });
     items.forEach(function (it) { ul.appendChild(el("li", null, it.text)); });

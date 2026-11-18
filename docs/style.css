@@ -104,6 +104,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .chart .now-lbl { fill: var(--text-primary); font-size: 12px; font-weight: 600; paint-order: stroke; stroke: var(--surface-1); stroke-width: 4px; stroke-linejoin: round; }
 .chart .grid { stroke: var(--grid); stroke-width: 1; }
 .chart .axis { stroke: var(--axis); stroke-width: 1; }
+.chart .trend { stroke: var(--text-primary); stroke-opacity: 0.6; stroke-width: 2; fill: none; stroke-linejoin: round; }
 .chart .err { stroke-width: 1.5; stroke-opacity: 0.55; }
 .chart .now { stroke: var(--text-secondary); stroke-width: 2; stroke-dasharray: 2 4; stroke-linecap: round; fill: none; }
 .chart .band { fill: var(--accent-wash); }

@@ -46,6 +46,10 @@ LABELS = {
     "seven_day_overage_included": "Weekly 'overage included' bar",
 }
 
+# Bars that get tracked. Per-model weekly bars (e.g. the Fable "overage included" one) are a fixed share of the
+# weekly limit on claude.ai, so they add nothing; --bars can change this.
+TRACKED_BARS = ("five_hour", "seven_day")
+
 METRICS = ("usd", "wtok", "rawtok")
 # Model-independent "weighted tokens": input-token equivalents using the standard
 # API multipliers (output 5x, 5m cache write 1.25x, 1h cache write 2x, cache read 0.1x).
@@ -799,6 +803,8 @@ def main(argv=None):
     ap.add_argument("--prices", default=os.path.join(HERE, "prices.json"))
     ap.add_argument("--plan", default=os.environ.get("LIMIT_TRACKER_PLAN"),
                     help="optional public plan label shown on the site, e.g. 'Max 20x'")
+    ap.add_argument("--bars", type=lambda v: tuple(x.strip() for x in v.split(",") if x.strip()),
+                    default=TRACKED_BARS, help="comma separated bar keys to track (default: five_hour,seven_day)")
     ap.add_argument("--rebuild", action="store_true",
                     help="recompute every window instead of keeping frozen (closed) windows from the previous run")
     a = ap.parse_args(argv)
@@ -833,7 +839,7 @@ def main(argv=None):
         except ValueError:
             prev = {}
     prev_windows = {}
-    for key, bar in (prev.get("bars") or {}).items():
+    for key, bar in ((k, b) for k, b in (prev.get("bars") or {}).items() if k in a.bars):
         for w in bar.get("windows", []):
             prev_windows[(w["bar"], w["reset"], w["seg"])] = w
     prev_events = prev.get("events") or []
@@ -842,6 +848,8 @@ def main(argv=None):
     events = []
     windows = {}
     for (key, reset), ss in sorted(group_samples(samples).items()):
+        if key not in a.bars:
+            continue
         for w in analyse_window(key, reset, ss, ledger, cover_start, rng, events):
             windows[(w["bar"], w["reset"], w["seg"])] = w
     kept = 0
@@ -860,6 +868,7 @@ def main(argv=None):
     for e in prev_events + events:
         if not any(x["type"] == e["type"] and x["bar"] == e["bar"] and abs(x["t1"] - e["t1"]) < 600 for x in allev):
             allev.append(e)
+    allev = [e for e in allev if e["bar"] in a.bars]
     allev.sort(key=lambda e: e["t1"])
 
     bars = {}
