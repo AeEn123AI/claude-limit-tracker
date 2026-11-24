@@ -6,8 +6,9 @@
 set -eu
 cd "$(dirname "$0")/.."
 python3 collector/collect.py
+python3 tools/og_meta.py
 python3 tools/privacy_check.py
-git add docs/data
+git add docs/data docs/index.html
 if git diff --cached --quiet; then
   echo "no data changes"
   exit 0
